@@ -5,7 +5,7 @@
 //  Created on 2026-01-25.
 //
 
-import Foundation
+import SwiftUI
 import Combine
 import GRDB
 import os
@@ -176,6 +176,13 @@ final class BenchmarkViewModel: ObservableObject {
     private var benchmarkStartTime: Date?
     private var sampleTimer: Timer?
     private var uiUpdateTimer: Timer?
+
+    // MARK: - Auxiliary Windows
+
+    /// References to spawned windows (kept alive while open)
+    private(set) var historyWindow: NSWindow?
+    private(set) var expandedMetricsWindow: NSWindow?
+    private var sessionDetailWindows: [Int64: NSWindow] = [:]
 
     // Sampling configuration
     private let sampleInterval: TimeInterval = 0.5   // Sample metrics at 2Hz (was 0.1s/10Hz — reduced to match MetricsService polling)
@@ -657,6 +664,129 @@ final class BenchmarkViewModel: ObservableObject {
     /// Get the current samples (for history/export)
     var currentSamples: [BenchmarkSample] {
         currentSamplesInternal
+    }
+
+    // MARK: - Window Management
+
+    /// Open the benchmark history in a resizable window
+    func openHistoryWindow() {
+        // Bring existing window to front if already open
+        if let existing = historyWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(self)
+            return
+        }
+
+        let view = SessionHistoryView(viewModel: self)
+        let controller = NSHostingController(rootView: view)
+        let mask: NSWindow.StyleMask = [.titled, .closable, .resizable, .miniaturizable]
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+            styleMask: mask,
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = controller
+        window.title = "Benchmark History"
+        window.minSize = NSSize(width: 600, height: 400)
+        window.isReleasedWhenClosed = false
+        window.tabbingIdentifier = "com.anubis.history"
+        window.tabbingMode = .preferred
+        let autosaveName = NSWindow.FrameAutosaveName("AnubisHistoryWindow")
+        if !window.setFrameAutosaveName(autosaveName) {
+            window.center()
+        }
+        window.makeKeyAndOrderFront(self)
+        historyWindow = window
+    }
+
+    /// Open a session detail as a new tab in the history window
+    func openSessionDetailTab(session: BenchmarkSession) {
+        guard let sessionId = session.id else { return }
+
+        // If already open, bring to front
+        if let existing = sessionDetailWindows[sessionId], existing.isVisible {
+            existing.makeKeyAndOrderFront(self)
+            return
+        }
+
+        let view = SessionDetailView(session: session, viewModel: self)
+            .frame(minWidth: 500, minHeight: 400)
+        let controller = NSHostingController(rootView: view)
+        let mask: NSWindow.StyleMask = [.titled, .closable, .resizable, .miniaturizable]
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            styleMask: mask,
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = controller
+        window.title = "\(session.modelName) — \(Formatters.relativeDate(session.startedAt))"
+        window.minSize = NSSize(width: 500, height: 400)
+        window.isReleasedWhenClosed = false
+        window.tabbingIdentifier = "com.anubis.history"
+        window.tabbingMode = .preferred
+
+        // Add as a tab to the history window if it exists
+        if let historyWin = historyWindow, historyWin.isVisible {
+            historyWin.addTabbedWindow(window, ordered: .above)
+            window.makeKeyAndOrderFront(self)
+        } else {
+            window.center()
+            window.makeKeyAndOrderFront(self)
+        }
+        sessionDetailWindows[sessionId] = window
+    }
+
+    /// Open the expanded metrics dashboard in a resizable window
+    func openExpandedMetricsWindow() {
+        if let existing = expandedMetricsWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(self)
+            return
+        }
+
+        // Size the view to fill available space
+        let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
+        let width = max(900, screenFrame.width * 0.8)
+        let height = max(700, screenFrame.height * 0.8)
+        let contentSize = NSSize(width: width, height: height)
+
+        let view = ExpandedMetricsView(viewModel: self)
+            .frame(minWidth: 700, idealWidth: width, minHeight: 500, idealHeight: height)
+        let controller = NSHostingController(rootView: view)
+        controller.preferredContentSize = contentSize
+
+        let mask: NSWindow.StyleMask = [.titled, .closable, .resizable, .miniaturizable]
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+            styleMask: mask,
+            backing: .buffered,
+            defer: false
+        )
+        window.contentViewController = controller
+        window.title = "Benchmark Results — \(selectedModel?.name ?? "No Model")"
+        window.minSize = NSSize(width: 700, height: 500)
+        window.isReleasedWhenClosed = false
+        window.tabbingMode = .disallowed
+        let autosaveName = NSWindow.FrameAutosaveName("AnubisExpandedMetricsWindow")
+        if !window.setFrameAutosaveName(autosaveName) {
+            // First launch or name collision — set explicit frame and center
+            window.setFrame(NSRect(x: 0, y: 0, width: width, height: height), display: false)
+            window.center()
+        }
+        window.makeKeyAndOrderFront(self)
+        expandedMetricsWindow = window
+    }
+
+    /// Close any open auxiliary windows (called when navigating away)
+    func closeAuxiliaryWindows() {
+        historyWindow?.close()
+        historyWindow = nil
+        expandedMetricsWindow?.close()
+        expandedMetricsWindow = nil
+        for (_, window) in sessionDetailWindows {
+            window.close()
+        }
+        sessionDetailWindows.removeAll()
     }
 
     // MARK: - Private Methods

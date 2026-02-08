@@ -12,8 +12,6 @@ import AppKit
 /// Main benchmark dashboard view
 struct BenchmarkView: View {
     @StateObject private var viewModel: BenchmarkViewModel
-    @State private var showingHistory = false
-    @State private var showingExpandedMetrics = false
     @State private var showSystemPrompt = false
     @State private var showParameters = false
 
@@ -55,24 +53,21 @@ struct BenchmarkView: View {
         .toolbar {
             ToolbarItemGroup {
                 Button {
-                    showingExpandedMetrics.toggle()
+                    viewModel.openExpandedMetricsWindow()
                 } label: {
                     Label("Expand Results", systemImage: "arrow.up.left.and.arrow.down.right")
                 }
                 .help("Expand metrics dashboard")
 
                 Button {
-                    showingHistory.toggle()
+                    viewModel.openHistoryWindow()
                 } label: {
                     Label("History", systemImage: "clock.arrow.circlepath")
                 }
             }
         }
-        .sheet(isPresented: $showingHistory) {
-            SessionHistoryView(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showingExpandedMetrics) {
-            ExpandedMetricsView(viewModel: viewModel)
+        .onDisappear {
+            viewModel.closeAuxiliaryWindows()
         }
         .task {
             await viewModel.loadModels()
@@ -846,10 +841,9 @@ struct ModelMemoryCard: View {
 
 // MARK: - Expanded Metrics View
 
-/// Full-screen view of the metrics dashboard
+/// Expanded metrics dashboard (presented as a resizable window)
 struct ExpandedMetricsView: View {
     @ObservedObject var viewModel: BenchmarkViewModel
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 0) {
@@ -877,7 +871,7 @@ struct ExpandedMetricsView: View {
                     }
                 }
 
-                Button("Done") { dismiss() }
+                Button("Done") { NSApp.keyWindow?.close() }
                     .keyboardShortcut(.escape, modifiers: [])
             }
             .padding(Spacing.md)
@@ -900,7 +894,6 @@ struct ExpandedMetricsView: View {
                 .padding(Spacing.lg)
             }
         }
-        .frame(minWidth: 800, minHeight: 900)
     }
 
     // MARK: - Metrics Cards Section

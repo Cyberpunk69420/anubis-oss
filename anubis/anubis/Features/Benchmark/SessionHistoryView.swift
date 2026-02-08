@@ -9,10 +9,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 @preconcurrency import GRDB
 
-/// Sheet view displaying benchmark session history
+/// View displaying benchmark session history (presented as a window)
 struct SessionHistoryView: View {
     @ObservedObject var viewModel: BenchmarkViewModel
-    @Environment(\.dismiss) private var dismiss
     @State private var selectedSession: BenchmarkSession?
     @State private var showingClearConfirmation = false
     @State private var showingExportOptions = false
@@ -84,7 +83,7 @@ struct SessionHistoryView: View {
                     .padding(.horizontal, Spacing.sm)
 
                 Button("Done") {
-                    dismiss()
+                    NSApp.keyWindow?.close()
                 }
                 .keyboardShortcut(.escape, modifiers: [])
             }
@@ -125,9 +124,12 @@ struct SessionHistoryView: View {
             } message: {
                 Text("This will permanently delete all \(viewModel.recentSessions.count) benchmark sessions and their data.")
             }
-        .frame(minWidth: 900, minHeight: 800)
+        .frame(minWidth: 600, minHeight: 400)
         .task {
             await viewModel.loadRecentSessions()
+            if selectedSession == nil, let latest = viewModel.recentSessions.first {
+                selectedSession = latest
+            }
         }
     }
 
@@ -136,7 +138,16 @@ struct SessionHistoryView: View {
             List(viewModel.recentSessions, selection: $selectedSession) { session in
                 SessionRow(session: session)
                     .tag(session)
+                    .background(DoubleClickHandler {
+                        viewModel.openSessionDetailTab(session: session)
+                    })
                     .contextMenu {
+                        Button {
+                            viewModel.openSessionDetailTab(session: session)
+                        } label: {
+                            Label("Open in Tab", systemImage: "macwindow.badge.plus")
+                        }
+
                         if session.status == .running {
                             Button {
                                 Task {
@@ -583,5 +594,38 @@ struct StatCell: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .metricCardStyle()
+    }
+}
+
+// MARK: - Double Click Handler
+
+/// NSViewRepresentable that detects double-clicks inside List rows
+/// (SwiftUI gesture recognizers don't work reliably inside NSTableView-backed Lists)
+private struct DoubleClickHandler: NSViewRepresentable {
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = DoubleClickView(action: action)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private class DoubleClickView: NSView {
+        let action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func mouseDown(with event: NSEvent) {
+            super.mouseDown(with: event)
+            if event.clickCount == 2 {
+                action()
+            }
+        }
     }
 }
