@@ -37,9 +37,9 @@ struct BenchmarkView: View {
                     responseSection
                 }
             }
-            .frame(minWidth: 320, idealWidth: 380)
+            .frame(minWidth: 280, idealWidth: 300)
 
-            // Right panel - Metrics Dashboard (wider, ~70% default)
+            // Right panel - Metrics Dashboard (~70% default)
             ScrollView {
                 VStack(spacing: Spacing.md) {
                     metricsCardsSection
@@ -425,8 +425,10 @@ struct BenchmarkView: View {
             } else {
                 // Use TextEditor for efficient rendering of long streaming text
                 // (SwiftUI Text recalculates layout on every change, causing slowdown)
-                StreamingTextView(
-                    text: viewModel.responseText,
+                // Observe the isolated ResponseTextStore — not viewModel.responseText —
+                // so metric card @Published flushes don't trigger NSTextView re-evaluation.
+                StreamingResponseView(
+                    store: viewModel.responseTextStore,
                     placeholder: "Response will appear here..."
                 )
             }
@@ -709,13 +711,33 @@ extension ThermalState {
     }
 }
 
+// MARK: - Streaming Response Wrapper
+
+/// Wrapper that observes only the ResponseTextStore, isolating the NSTextView
+/// from BenchmarkViewModel's @Published cascade.
+private struct StreamingResponseView: View {
+    @ObservedObject var store: ResponseTextStore
+    let placeholder: String
+
+    var body: some View {
+        StreamingTextView(text: store.text, placeholder: placeholder)
+    }
+}
+
 // MARK: - Streaming Text View
 
-/// Efficient text view for streaming content using NSTextView
-/// SwiftUI's Text view recalculates layout on every change, causing slowdown with long text
+/// Efficient text view for streaming content using NSTextView with incremental append.
+///
+/// Instead of replacing the full string on every update (O(n) comparison + O(n) relayout),
+/// this tracks how much text has been rendered and only appends the new delta via
+/// NSTextStorage — making each update O(delta) regardless of total response length.
 struct StreamingTextView: NSViewRepresentable {
     let text: String
     let placeholder: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
@@ -726,9 +748,13 @@ struct StreamingTextView: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.drawsBackground = false
         textView.font = .systemFont(ofSize: NSFont.systemFontSize)
+        textView.textColor = .labelColor
         textView.textContainerInset = NSSize(width: 12, height: 12)
         textView.isAutomaticQuoteSubstitutionEnabled = false
         textView.isAutomaticDashSubstitutionEnabled = false
+
+        // Skip layout for offscreen text — critical for long streaming responses
+        textView.layoutManager?.allowsNonContiguousLayout = true
 
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
@@ -736,35 +762,78 @@ struct StreamingTextView: NSViewRepresentable {
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
 
+        // Show placeholder initially
+        if text.isEmpty {
+            textView.string = placeholder
+            textView.textColor = .secondaryLabelColor
+        }
+
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
+        let coordinator = context.coordinator
+        let newNSLength = (text as NSString).length
 
-        let displayText = text.isEmpty ? placeholder : text
-        let isPlaceholder = text.isEmpty
-
-        // Only update if text changed (avoid unnecessary work)
-        if textView.string != displayText {
-            // Preserve scroll position if user scrolled up
-            let wasAtBottom = isScrolledToBottom(scrollView)
-
-            textView.string = displayText
-            textView.textColor = isPlaceholder ? .secondaryLabelColor : .labelColor
-
-            // Auto-scroll to bottom if was at bottom (follow streaming)
-            if wasAtBottom && !isPlaceholder {
-                textView.scrollToEndOfDocument(nil)
+        if text.isEmpty {
+            // Show placeholder (or already showing it)
+            if !coordinator.isShowingPlaceholder {
+                textView.string = placeholder
+                textView.textColor = .secondaryLabelColor
+                coordinator.isShowingPlaceholder = true
+                coordinator.renderedUTF16Length = 0
             }
+            return
         }
+
+        // Text was reset (new benchmark started) — full replacement
+        if newNSLength < coordinator.renderedUTF16Length || coordinator.isShowingPlaceholder {
+            coordinator.isShowingPlaceholder = false
+            textView.textColor = .labelColor
+            textView.string = text
+            coordinator.renderedUTF16Length = newNSLength
+            textView.scrollToEndOfDocument(nil)
+            return
+        }
+
+        // No change — skip entirely (O(1) integer check, not O(n) string comparison)
+        if newNSLength == coordinator.renderedUTF16Length {
+            return
+        }
+
+        // Incremental append — only the new delta via NSTextStorage
+        let wasAtBottom = isScrolledToBottom(scrollView)
+        let delta = (text as NSString).substring(from: coordinator.renderedUTF16Length)
+
+        if let storage = textView.textStorage {
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: textView.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize),
+                .foregroundColor: NSColor.labelColor
+            ]
+            storage.beginEditing()
+            storage.append(NSAttributedString(string: delta, attributes: attrs))
+            storage.endEditing()
+        }
+
+        coordinator.renderedUTF16Length = newNSLength
+
+        if wasAtBottom {
+            textView.scrollToEndOfDocument(nil)
+        }
+    }
+
+    class Coordinator {
+        /// Tracks how many UTF-16 code units have been rendered in the NSTextView.
+        /// NSString.length is O(1), so this comparison is always cheap.
+        var renderedUTF16Length: Int = 0
+        var isShowingPlaceholder: Bool = true
     }
 
     private func isScrolledToBottom(_ scrollView: NSScrollView) -> Bool {
         guard let textView = scrollView.documentView as? NSTextView else { return true }
         let visibleRect = scrollView.contentView.bounds
         let contentHeight = textView.bounds.height
-        // Consider "at bottom" if within 50 points of the end
         return visibleRect.maxY >= contentHeight - 50
     }
 }

@@ -253,12 +253,17 @@ final class InferenceService: ObservableObject {
     // MARK: - Inference
 
     /// Generate a streaming response
+    ///
+    /// Stream production runs off MainActor so network I/O and JSON parsing
+    /// don't compete with UI rendering for main-thread time.
     func generate(request: InferenceRequest) -> AsyncThrowingStream<InferenceChunk, Error> {
         let backend = activeBackend
         return AsyncThrowingStream { continuation in
-            Task { @MainActor in
-                self.isGenerating = true
-                self.lastError = nil
+            Task.detached { [weak self] in
+                await MainActor.run { [weak self] in
+                    self?.isGenerating = true
+                    self?.lastError = nil
+                }
 
                 do {
                     let stream = await backend.generate(request: request)
@@ -270,15 +275,19 @@ final class InferenceService: ObservableObject {
                     }
                     continuation.finish()
                 } catch {
-                    if let anubisError = error as? AnubisError {
-                        self.lastError = anubisError
-                    } else {
-                        self.lastError = .networkError(underlying: error)
+                    await MainActor.run { [weak self] in
+                        if let anubisError = error as? AnubisError {
+                            self?.lastError = anubisError
+                        } else {
+                            self?.lastError = .networkError(underlying: error)
+                        }
                     }
                     continuation.finish(throwing: error)
                 }
 
-                self.isGenerating = false
+                await MainActor.run { [weak self] in
+                    self?.isGenerating = false
+                }
             }
         }
     }

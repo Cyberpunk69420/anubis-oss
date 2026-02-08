@@ -25,6 +25,25 @@ final class BenchmarkChartStore: ObservableObject {
     }
 }
 
+/// Isolated observable for streaming response text.
+/// Prevents metric card @Published updates from triggering text view re-evaluation.
+@MainActor
+final class ResponseTextStore: ObservableObject {
+    @Published private(set) var text: String = ""
+
+    func append(_ delta: String) {
+        text += delta
+    }
+
+    func set(_ value: String) {
+        text = value
+    }
+
+    func reset() {
+        text = ""
+    }
+}
+
 /// ViewModel for the Benchmark module
 /// Manages benchmark sessions, coordinates inference with metrics collection
 @MainActor
@@ -40,8 +59,8 @@ final class BenchmarkViewModel: ObservableObject {
     /// Current real-time metrics during benchmark
     @Published private(set) var currentMetrics: SystemMetrics?
 
-    /// Accumulated response text
-    @Published private(set) var responseText = ""
+    /// Accumulated response text (internal only — views observe responseTextStore instead)
+    private var responseText = ""
 
     /// When false, suppress response text rendering during benchmark for minimal CPU interference.
     /// Text is still accumulated internally and shown on completion.
@@ -164,6 +183,10 @@ final class BenchmarkViewModel: ObservableObject {
     /// entire view hierarchy (especially text streaming) on every chart update.
     let chartStore = BenchmarkChartStore()
 
+    /// Response text lives in a separate observable so metric card @Published
+    /// updates don't trigger NSTextView re-evaluation (the #1 streaming bottleneck).
+    let responseTextStore = ResponseTextStore()
+
     // MARK: - Dependencies
 
     private let inferenceService: InferenceService
@@ -196,6 +219,10 @@ final class BenchmarkViewModel: ObservableObject {
     private var pendingTokenCount: Int = 0
     private var pendingTps: Double = 0
     private var pendingPeakTps: Double = 0
+
+    // Debug state buffers (avoid per-chunk @Published mutations)
+    private var debugChunkCount: Int = 0
+    private var debugBytesReceived: Int = 0
 
     // Running power accumulators (updated each sample, flushed to @Published at UI rate)
     private var gpuPowerSum: Double = 0
@@ -300,6 +327,7 @@ final class BenchmarkViewModel: ObservableObject {
 
         // Reset state
         responseText = ""
+        responseTextStore.reset()
         tokensGenerated = 0
         currentTokensPerSecond = 0
         peakTokensPerSecond = 0
@@ -323,6 +351,8 @@ final class BenchmarkViewModel: ObservableObject {
         pendingTokenCount = 0
         pendingTps = 0
         pendingPeakTps = 0
+        debugChunkCount = 0
+        debugBytesReceived = 0
         gpuPowerSum = 0
         systemPowerSum = 0
         powerSampleCount = 0
@@ -410,7 +440,6 @@ final class BenchmarkViewModel: ObservableObject {
 
                 var stats: InferenceStats?
                 var tokenCount = 0
-                var debugChunkCount = 0
                 let startTime = Date()
                 var firstTokenTime: Date?
                 var lastSampleTime = startTime
@@ -434,10 +463,7 @@ final class BenchmarkViewModel: ObservableObject {
                     textBuffer += chunk.text
                     tokenCount += 1
                     debugChunkCount += 1
-                    self.debugState.chunksReceived = debugChunkCount
-                    self.debugState.bytesReceived += chunk.text.utf8.count
-                    self.debugState.lastChunkAt = Date()
-                    self.debugState.phase = .streaming
+                    debugBytesReceived += chunk.text.utf8.count
 
                     let now = Date()
                     let totalElapsed = now.timeIntervalSince(startTime)
@@ -824,6 +850,8 @@ final class BenchmarkViewModel: ObservableObject {
     private func flushUIUpdates() {
         // Only flush text if streaming is enabled (otherwise accumulate in buffer until completion)
         if streamResponse && !textBuffer.isEmpty {
+            // Append to isolated ResponseTextStore (won't cascade to metric card views)
+            responseTextStore.append(textBuffer)
             responseText += textBuffer
             textBuffer = ""
         }
@@ -848,6 +876,14 @@ final class BenchmarkViewModel: ObservableObject {
             let newAvgSys = systemPowerSum / Double(powerSampleCount)
             if newAvgSys != avgSystemPower { avgSystemPower = newAvgSys }
             if pendingPeakSystemPower != peakSystemPower { peakSystemPower = pendingPeakSystemPower }
+        }
+
+        // Batch debug state update (single @Published mutation instead of 4× per chunk)
+        if debugChunkCount > 0 {
+            debugState.chunksReceived = debugChunkCount
+            debugState.bytesReceived = debugBytesReceived
+            debugState.lastChunkAt = Date()
+            debugState.phase = .streaming
         }
     }
 
@@ -1002,6 +1038,7 @@ final class BenchmarkViewModel: ObservableObject {
         // Dump any suppressed text before final flush
         if !streamResponse && !textBuffer.isEmpty {
             responseText += textBuffer
+            responseTextStore.set(responseText)
             textBuffer = ""
         }
 
