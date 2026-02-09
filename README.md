@@ -316,7 +316,7 @@ Contributions are welcome. A few guidelines:
 
 If Anubis is useful to you, consider [sponsoring on GitHub](https://github.com/sponsors/Cyberpunk69420). It helps fund continued development and new features.
 
-A sandboxed version is also available on the [Mac App Store](https://www.devpadapp.com/nabu.html) if you prefer a managed install.
+A sandboxed, less feature rich version is also available on the [Mac App Store](https://apps.apple.com/us/app-bundle/the-architects-toolkit/id1874965091?mt=12) if you prefer a managed install.
 
 ---
 
