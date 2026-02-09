@@ -8,9 +8,11 @@
 
 **Local LLM Testing & Benchmarking for Apple Silicon**
 
-Anubis is a native macOS app for benchmarking, comparing, and managing local large language models using any OpenAI-compatible endpoint — Ollama, MLX, LM Studio Server, OpenWebUI, Docker Models, etc. Built with SwiftUI for Apple Silicon, it provides real-time hardware telemetry correlated with full, history-saved inference performance — something no CLI tool or chat wrapper offers. You can even `OLLAMA PULL` models directly within the app.
+Anubis is a native macOS app for benchmarking, comparing, and managing local large language models using any OpenAI-compatible endpoint - Ollama, MLX, LM Studio Server, OpenWebUI, Docker Models, etc. Built with SwiftUI for Apple Silicon, it provides real-time hardware telemetry correlated with full, history-saved inference performance - something no CLI tool or chat wrapper offers. Export benchmarks directly without having to screenshot, and export the raw data as .MD or .CSV from the history. You can even `OLLAMA PULL` models directly within the app.
 
-<img width="506" height="701" alt="anubis6" src="https://github.com/user-attachments/assets/5848a476-d577-405b-8830-52f751fd4b74" />
+<img width="550" height="756" alt="anubis-gemma-7b-2026-02-09T18-48-54Z" src="https://github.com/user-attachments/assets/c52d4309-9adf-456f-84cc-12c0f0550996" />
+
+<img width="900" height="560" alt="Screenshot 2026-02-09 at 1 48 47 PM" src="https://github.com/user-attachments/assets/e8eabae3-3bba-4171-ab3f-f42bd73d4d19" />
 
 ---
 
@@ -23,7 +25,7 @@ The local LLM ecosystem on macOS is fragmented:
 - **Evaluation frameworks** (promptfoo) require YAML configs and terminal expertise
 - **No tool** correlates hardware metrics (GPU / CPU / ANE / power / memory) with inference speed in real time
 
-Anubis fills that gap with three integrated modules — all in a native macOS app.
+Anubis fills that gap with three integrated modules - all in a native macOS app.
 
 ---
 
@@ -36,7 +38,7 @@ Real-time performance dashboard for single-model testing.
 - Select any model from any configured backend
 - Stream responses with live metrics overlay
 - **8 metric cards**: Tokens/sec, GPU %, CPU %, Time to First Token, Process Memory, Model Memory, Thermal State, GPU Frequency
-- **7 live charts**: Tokens/sec, GPU utilization, CPU utilization, process memory, GPU/CPU/ANE/DRAM power, GPU frequency — all updating in real time
+- **7 live charts**: Tokens/sec, GPU utilization, CPU utilization, process memory, GPU/CPU/ANE/DRAM power, GPU frequency - all updating in real time
 - **Power telemetry**: Real-time GPU, CPU, ANE, and DRAM power consumption in watts via IOReport
 - **Process monitoring**: Auto-detects backend process by port (Ollama, LM Studio, mlx-lm, vLLM, etc.) with manual process picker
 - Detailed session stats: peak tokens/sec, average token latency, model load time, context length, eval duration, power averages
@@ -44,7 +46,7 @@ Real-time performance dashboard for single-model testing.
 - **Prompt presets** organized by category (Quick, Reasoning, Coding, Creative, Benchmarking)
 - **Session history** with full replay, CSV export, and Markdown reports
 - Expanded full-screen metrics dashboard
-- **Image export**: Copy to clipboard, save as PNG, or share — 2x retina rendering with watermark, respects light/dark mode
+- **Image export**: Copy to clipboard, save as PNG, or share - 2x retina rendering with watermark, respects light/dark mode
 
 ### Arena
 
@@ -54,7 +56,7 @@ Side-by-side A/B model comparison with the same prompt.
 - **Sequential** mode (memory-safe, one at a time) or **Parallel** mode (both simultaneously)
 - Shared prompt, system prompt, and generation parameters
 - Real-time streaming in both panels
-- **Voting system**: pick Model A, Model B, or Tie — votes are persisted
+- **Voting system**: pick Model A, Model B, or Tie - votes are persisted
 - Per-panel stats grid (9 metrics each)
 - Model manager: view loaded models and unload to free memory
 - Comparison history with voting records
@@ -66,26 +68,26 @@ Unified model management across all backends.
 - Aggregated model list with search and backend filter chips
 - Running models section with live VRAM usage
 - Model inspector: size, parameters, quantization, family, context window, architecture details, file path
-- **Automatic metadata enrichment** for OpenAI-compatible models — parses model IDs for family and parameter count, scans `~/.lmstudio/models/` and `~/.cache/huggingface/hub/` for disk size, quantization, and path
+- **Automatic metadata enrichment** for OpenAI-compatible models - parses model IDs for family and parameter count, scans `~/.lmstudio/models/` and `~/.cache/huggingface/hub/` for disk size, quantization, and path
 - Pull new models, delete existing ones, unload from memory
 - Popular model suggestions for quick setup
 - Total disk usage display
 
 ---
 ## Screenshots
+<img width="900" height="600" alt="Screenshot 2026-02-09 at 1 55 10 PM" src="https://github.com/user-attachments/assets/fcbb9dbe-14bb-46ff-a956-64445372c53e" />
 
-<img width="554" height="414" alt="anubis5" src="https://github.com/user-attachments/assets/6c71d7c7-8c62-4b4a-b0f4-60db98c0e802" />
+<img width="850" height="560" alt="Screenshot 2026-02-09 at 1 53 46 PM" src="https://github.com/user-attachments/assets/81b14a1c-4196-4462-b56c-28d2da9cb0b6" />
 
-<img width="443" height="476" alt="anubis2" src="https://github.com/user-attachments/assets/2bf8d79e-cb9f-4fbf-a449-f34a16308cf5" />
+<img width="911" height="560" alt="Screenshot 2026-02-09 at 1 49 22 PM" src="https://github.com/user-attachments/assets/cb57267c-6070-4860-86c3-3f239811c012" />
 
-<img width="470" height="593" alt="anubis1" src="https://github.com/user-attachments/assets/d6a36d43-892e-4e7f-8028-4915d268c206" />
-
+<img width="911" height="560" alt="Screenshot 2026-02-09 at 1 49 16 PM" src="https://github.com/user-attachments/assets/7703b283-f00e-49e9-a702-74a2bc2005ce" />
 
 ## Supported Backends
 
 | Backend | Type | Default Port | Setup |
 |---------|------|--------------|-------|
-| **Ollama** | Native support | 11434 | Install from [ollama.com](https://ollama.com) — auto-detected on launch |
+| **Ollama** | Native support | 11434 | Install from [ollama.com](https://ollama.com) - auto-detected on launch |
 | **LM Studio** | OpenAI-compatible | 1234 | Enable local server in LM Studio settings |
 | **mlx-lm** | OpenAI-compatible | 8080 | `pip install mlx-lm && mlx_lm.server --model <model>` |
 | **vLLM** | OpenAI-compatible | 8000 | Add in Settings |
@@ -117,18 +119,18 @@ Anubis automatically detects which process is serving your model:
 
 - **Port-based detection**: Uses `lsof` to find the PID listening on the inference port (called once per benchmark start)
 - **Backend identification**: Matches process path and command-line args to identify Ollama, LM Studio, mlx-lm, vLLM, LocalAI, llama.cpp
-- **Memory accounting**: Uses `phys_footprint` (same as Activity Monitor) which includes Metal/GPU buffer allocations — critical for MLX and other GPU-accelerated backends
+- **Memory accounting**: Uses `phys_footprint` (same as Activity Monitor) which includes Metal/GPU buffer allocations - critical for MLX and other GPU-accelerated backends
 - **LM Studio support**: Walks Electron app bundle descendants to find the model-serving process
 - **Manual override**: Process picker lets you select any process by name, sorted by memory usage
 
-Metrics degrade gracefully — if IOReport access is unavailable (e.g., in a VM), Anubis still shows inference-derived metrics.
+Metrics degrade gracefully - if IOReport access is unavailable (e.g., in a VM), Anubis still shows inference-derived metrics.
 
 ---
 
 ## Requirements
 
 - **macOS 15.0** (Sequoia) or later
-- **Apple Silicon** (M1 / M2 / M3 / M4 / M5 +) — Intel is not supported
+- **Apple Silicon** (M1 / M2 / M3 / M4 / M5 +) - Intel is not supported
 - **8 GB** unified memory minimum (16 GB+ recommended for larger models)
 - At least one inference backend installed (Ollama recommended)
 
@@ -139,7 +141,7 @@ Metrics degrade gracefully — if IOReport access is unavailable (e.g., in a VM)
 ### 1. Install Ollama (or another backend)
 
 ```bash
-# macOS — install Ollama
+# macOS - install Ollama
 brew install ollama
 
 # Start the server
@@ -261,7 +263,7 @@ protocol InferenceBackend {
 
 ## Data Storage
 
-All data is stored locally — nothing leaves your machine.
+All data is stored locally - nothing leaves your machine.
 
 | Data | Location |
 |------|----------|
@@ -303,18 +305,18 @@ curl http://localhost:11434/api/tags
 
 Contributions are welcome. A few guidelines:
 
-1. **Follow the existing patterns** — MVVM, async/await, guard-let over force-unwrap
-2. **Keep files under 300 lines** — split if larger
-3. **One feature per PR** — small, focused changes are easier to review
-4. **Test services and integrations** — views are harder to unit test, but services should have coverage
-5. **Handle errors gracefully** — always provide `errorDescription` and `recoverySuggestion`
+1. **Follow the existing patterns** - MVVM, async/await, guard-let over force-unwrap
+2. **Keep files under 300 lines** - split if larger
+3. **One feature per PR** - small, focused changes are easier to review
+4. **Test services and integrations** - views are harder to unit test, but services should have coverage
+5. **Handle errors gracefully** - always provide `errorDescription` and `recoverySuggestion`
 
 ### Adding a New Backend
 
 1. Create a new file in `Integrations/` implementing `InferenceBackend`
 2. Register it in `InferenceService`
 3. Add configuration UI in `Settings/`
-4. That's it — the rest of the app works through the protocol
+4. That's it - the rest of the app works through the protocol
 
 ---
 
@@ -328,6 +330,6 @@ A sandboxed, less feature rich version is also available on the [Mac App Store](
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 **Other projects:** [DevPad](https://www.devpadapp.com) · [Nabu](https://www.devpadapp.com/nabu.html)
