@@ -22,9 +22,8 @@ struct TimelineChart: View {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                if !data.isEmpty {
-                    let avg = data.map(\.1).reduce(0, +) / Double(data.count)
-                    Text(formatValue(avg))
+                if let last = data.last {
+                    Text(formatValue(last.1))
                         .font(.mono(14, weight: .medium))
                         .foregroundStyle(color)
                 }

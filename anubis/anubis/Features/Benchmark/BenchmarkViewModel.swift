@@ -214,15 +214,24 @@ final class BenchmarkViewModel: ObservableObject {
     private var lastChartUpdate: Date = .distantPast
     private let maxChartDataPoints = 250  // Limit chart points to keep rendering fast
 
-    // Buffers for batched UI updates (non-published for performance)
-    private var textBuffer: String = ""
-    private var pendingTokenCount: Int = 0
-    private var pendingTps: Double = 0
-    private var pendingPeakTps: Double = 0
+    // Lock-protected stream buffers — written by Task.detached consumer, read by UI timer
+    private struct StreamBuffers {
+        var text: String = ""
+        var tokenCount: Int = 0
+        var peakTps: Double = 0
+        var chunkCount: Int = 0
+        var bytesReceived: Int = 0
+        var firstTokenTime: Date? = nil
+        var stats: InferenceStats? = nil
+        // Stream start time — readers compute fresh tps as tokenCount / elapsed
+        var startTime: Date = .distantPast
+        // For instantaneous tok/s calculation
+        var lastSampleTime: Date = .distantPast
+        var lastSampleTokens: Int = 0
+    }
 
-    // Debug state buffers (avoid per-chunk @Published mutations)
-    private var debugChunkCount: Int = 0
-    private var debugBytesReceived: Int = 0
+    private let streamLock = OSAllocatedUnfairLock(initialState: StreamBuffers())
+    private var consumeTask: Task<Void, Error>?
 
     // Running power accumulators (updated each sample, flushed to @Published at UI rate)
     private var gpuPowerSum: Double = 0
@@ -346,13 +355,8 @@ final class BenchmarkViewModel: ObservableObject {
         currentSamplesInternal = []
         chartStore.reset()
 
-        // Reset buffers
-        textBuffer = ""
-        pendingTokenCount = 0
-        pendingTps = 0
-        pendingPeakTps = 0
-        debugChunkCount = 0
-        debugBytesReceived = 0
+        // Reset stream buffers
+        streamLock.withLock { $0 = StreamBuffers() }
         gpuPowerSum = 0
         systemPowerSum = 0
         powerSampleCount = 0
@@ -407,11 +411,6 @@ final class BenchmarkViewModel: ObservableObject {
                 }
                 currentSession = session
 
-                // Now start proper sample collection with session ID
-                if let sessionId = session.id {
-                    startSampleCollection(sessionId: sessionId)
-                }
-
                 let request = InferenceRequest(
                     model: model.id,
                     prompt: promptText,
@@ -438,71 +437,81 @@ final class BenchmarkViewModel: ObservableObject {
                     maxTokens: self.maxTokens, temperature: self.temperature, topP: self.topP
                 )
 
-                var stats: InferenceStats?
-                var tokenCount = 0
+                // Reset stream buffers and launch off-MainActor consumer
+                self.streamLock.withLock { $0 = StreamBuffers() }
+
+                let stream = await inferenceService.generate(request: request)
                 let startTime = Date()
-                var firstTokenTime: Date?
-                var lastSampleTime = startTime
-                var lastSampleTokens = 0
-                let instantaneousSampleInterval: TimeInterval = 0.25  // Calculate instantaneous rate every 250ms
+                self.streamLock.withLock { $0.startTime = startTime }
+                let instantaneousSampleInterval: TimeInterval = 0.25
 
-                for try await chunk in inferenceService.generate(request: request) {
-                    if Task.isCancelled { break }
+                // Start sample collection now that the stream is established
+                if let sessionId = session.id {
+                    startSampleCollection(sessionId: sessionId)
+                }
 
-                    // Track time to first token (update Published immediately - this is a one-time event)
-                    if firstTokenTime == nil && !chunk.text.isEmpty {
-                        firstTokenTime = Date()
-                        timeToFirstToken = firstTokenTime!.timeIntervalSince(startTime)
-                        self.debugState.firstChunkAt = firstTokenTime
+                // Drain stream at network speed — no MainActor contention
+                let lock = self.streamLock
+                self.consumeTask = Task.detached { [lock] in
+                    for try await chunk in stream {
+                        if Task.isCancelled { break }
+                        lock.withLock { buf in
+                            buf.text += chunk.text
+                            buf.tokenCount += 1
+                            buf.chunkCount += 1
+                            buf.bytesReceived += chunk.text.utf8.count
 
-                        // Fetch model memory now that model is loaded
-                        await self.fetchModelMemory()
-                    }
+                            let now = Date()
 
-                    // Buffer text and stats (don't update @Published on every token)
-                    textBuffer += chunk.text
-                    tokenCount += 1
-                    debugChunkCount += 1
-                    debugBytesReceived += chunk.text.utf8.count
+                            // Instantaneous peak tracking
+                            if buf.lastSampleTime == .distantPast {
+                                buf.lastSampleTime = now
+                                buf.lastSampleTokens = buf.tokenCount
+                            } else {
+                                let delta = now.timeIntervalSince(buf.lastSampleTime)
+                                if delta >= instantaneousSampleInterval {
+                                    let rate = Double(buf.tokenCount - buf.lastSampleTokens) / delta
+                                    buf.peakTps = max(buf.peakTps, rate)
+                                    buf.lastSampleTime = now
+                                    buf.lastSampleTokens = buf.tokenCount
+                                }
+                            }
 
-                    let now = Date()
-                    let totalElapsed = now.timeIntervalSince(startTime)
-
-                    // Calculate cumulative average tok/s (buffer it)
-                    if totalElapsed > 0 {
-                        pendingTps = Double(tokenCount) / totalElapsed
-                    }
-
-                    // Calculate instantaneous tok/s for peak tracking
-                    let sampleElapsed = now.timeIntervalSince(lastSampleTime)
-                    if sampleElapsed >= instantaneousSampleInterval {
-                        let tokensDelta = tokenCount - lastSampleTokens
-                        let instantaneousTps = Double(tokensDelta) / sampleElapsed
-                        pendingPeakTps = max(pendingPeakTps, instantaneousTps)
-                        lastSampleTime = now
-                        lastSampleTokens = tokenCount
-                    }
-
-                    // Update pending values for UI timer to flush
-                    pendingTokenCount = tokenCount
-
-                    if chunk.done, let chunkStats = chunk.stats {
-                        stats = chunkStats
+                            if buf.firstTokenTime == nil && !chunk.text.isEmpty {
+                                buf.firstTokenTime = now
+                            }
+                            if chunk.done, let s = chunk.stats { buf.stats = s }
+                        }
                     }
                 }
 
+                // Wait for stream to finish (suspends on MainActor cheaply — no work)
+                do {
+                    try await consumeTask!.value
+                } catch is CancellationError {
+                    // handled below via Task.isCancelled
+                } catch {
+                    throw error
+                }
+                self.consumeTask = nil
+                self.inferenceService.clearGenerating()
+
+                // Read final buffer state
+                let finalBuf = streamLock.withLock { $0 }
+
                 // Final flush of any remaining buffered content
-                flushUIUpdates()
+                flushTextOnly()
+                flushMetricUpdates()
 
                 // Calculate TTFT
-                let ttft: TimeInterval? = firstTokenTime.map { $0.timeIntervalSince(startTime) }
+                let ttft: TimeInterval? = finalBuf.firstTokenTime.map { $0.timeIntervalSince(startTime) }
 
                 // Compute power summary from collected samples
                 let powerSummary = BenchmarkSample.computePowerSummary(from: self.currentSamplesInternal)
                 let backendName = self.metricsService.latestMetrics?.backendProcessName
 
                 // Complete session
-                if let finalStats = stats {
+                if let finalStats = finalBuf.stats {
                     session.complete(
                         with: finalStats,
                         response: responseText,
@@ -515,9 +524,9 @@ final class BenchmarkViewModel: ObservableObject {
                     // Create stats from our tracking
                     let duration = Date().timeIntervalSince(startTime)
                     let manualStats = InferenceStats(
-                        totalTokens: tokenCount,
+                        totalTokens: finalBuf.tokenCount,
                         promptTokens: 0,
-                        completionTokens: tokenCount,
+                        completionTokens: finalBuf.tokenCount,
                         totalDuration: duration,
                         promptEvalDuration: 0,
                         evalDuration: duration,
@@ -542,13 +551,14 @@ final class BenchmarkViewModel: ObservableObject {
                 currentSession = session
                 self.debugState.phase = .complete
                 self.debugState.completedAt = Date()
-                if let finalStats = stats {
+                if let finalStats = finalBuf.stats {
                     self.debugState.finalTokensPerSecond = finalStats.tokensPerSecond
                     self.debugState.finalTotalTokens = finalStats.totalTokens
                 }
                 await finishBenchmark()
 
             } catch is CancellationError {
+                self.inferenceService.clearGenerating()
                 session.cancel()
                 try? await databaseManager.queue.write { db in
                     try session.update(db)
@@ -557,6 +567,7 @@ final class BenchmarkViewModel: ObservableObject {
                 await finishBenchmark()
 
             } catch {
+                self.inferenceService.clearGenerating()
                 session.fail()
                 try? await databaseManager.queue.write { db in
                     try session.update(db)
@@ -573,6 +584,8 @@ final class BenchmarkViewModel: ObservableObject {
 
     /// Stop the current benchmark
     func stopBenchmark() {
+        consumeTask?.cancel()
+        consumeTask = nil
         benchmarkTask?.cancel()
         benchmarkTask = nil
     }
@@ -841,49 +854,61 @@ final class BenchmarkViewModel: ObservableObject {
         let interval = streamResponse ? uiUpdateInterval : 1.0
         uiUpdateTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.flushUIUpdates()
+                self?.flushTextOnly()
             }
         }
     }
 
-    /// Flush buffered updates to @Published properties (called at fixed interval)
-    private func flushUIUpdates() {
-        // Only flush text if streaming is enabled (otherwise accumulate in buffer until completion)
-        if streamResponse && !textBuffer.isEmpty {
-            // Append to isolated ResponseTextStore (won't cascade to metric card views)
-            responseTextStore.append(textBuffer)
-            responseText += textBuffer
-            textBuffer = ""
+    /// Flush ONLY text from stream buffer to ResponseTextStore (called at 10Hz).
+    /// Zero BenchmarkViewModel @Published mutations — only touches the isolated
+    /// ResponseTextStore, so SwiftUI diffs are limited to StreamingTextView.
+    private func flushTextOnly() {
+        os_signpost(.begin, log: Signposts.streaming, name: "flushText")
+        defer { os_signpost(.end, log: Signposts.streaming, name: "flushText") }
+
+        let text = streamLock.withLock { buf -> String in
+            let t = buf.text
+            buf.text = ""
+            return t
         }
 
-        // Numeric updates are cheap — always flush
-        if pendingTokenCount != tokensGenerated {
-            tokensGenerated = pendingTokenCount
-        }
-        if pendingTps != currentTokensPerSecond {
-            currentTokensPerSecond = pendingTps
-        }
-        if pendingPeakTps != peakTokensPerSecond {
-            peakTokensPerSecond = pendingPeakTps
+        if streamResponse && !text.isEmpty {
+            responseTextStore.append(text)
+            responseText += text
         }
 
-        // Power running stats
-        if powerSampleCount > 0 {
-            let newAvgGpu = gpuPowerSum / Double(powerSampleCount)
-            if newAvgGpu != avgGpuPower { avgGpuPower = newAvgGpu }
-            if pendingPeakGpuPower != peakGpuPower { peakGpuPower = pendingPeakGpuPower }
-
-            let newAvgSys = systemPowerSum / Double(powerSampleCount)
-            if newAvgSys != avgSystemPower { avgSystemPower = newAvgSys }
-            if pendingPeakSystemPower != peakSystemPower { peakSystemPower = pendingPeakSystemPower }
+        // First token detection (one-time)
+        if self.timeToFirstToken == nil {
+            let ft = streamLock.withLock { $0.firstTokenTime }
+            if let ft {
+                self.timeToFirstToken = ft.timeIntervalSince(benchmarkStartTime!)
+                self.debugState.firstChunkAt = ft
+                Task { await self.fetchModelMemory() }
+            }
         }
+    }
 
-        // Batch debug state update (single @Published mutation instead of 4× per chunk)
-        if debugChunkCount > 0 {
-            debugState.chunksReceived = debugChunkCount
-            debugState.bytesReceived = debugBytesReceived
-            debugState.lastChunkAt = Date()
-            debugState.phase = .streaming
+    /// Flush numeric @Published properties (called at 2Hz from collectSample).
+    /// Keeps all BenchmarkViewModel objectWillChange mutations at sample cadence,
+    /// completely decoupled from the 10Hz text path.
+    private func flushMetricUpdates() {
+        os_signpost(.begin, log: Signposts.streaming, name: "flushMetrics")
+        defer { os_signpost(.end, log: Signposts.streaming, name: "flushMetrics") }
+
+        let snap = streamLock.withLock { $0 }
+
+        if snap.tokenCount != tokensGenerated {
+            tokensGenerated = snap.tokenCount
+        }
+        if let ftt = snap.firstTokenTime, snap.tokenCount > 0 {
+            let genElapsed = Date().timeIntervalSince(ftt)
+            let freshTps = genElapsed > 0 ? Double(snap.tokenCount) / genElapsed : 0
+            if freshTps != currentTokensPerSecond {
+                currentTokensPerSecond = freshTps
+            }
+        }
+        if snap.peakTps != peakTokensPerSecond {
+            peakTokensPerSecond = snap.peakTps
         }
     }
 
@@ -918,7 +943,13 @@ final class BenchmarkViewModel: ObservableObject {
     }
 
     private func collectSample(sessionId: Int64) async {
+        os_signpost(.begin, log: Signposts.streaming, name: "collectSample")
+        defer { os_signpost(.end, log: Signposts.streaming, name: "collectSample") }
+
         guard isRunning else { return }
+
+        // Flush numeric @Published properties at sample cadence (2Hz)
+        flushMetricUpdates()
 
         // Read cached metrics — NO system calls, just a property read
         guard let metrics = metricsService.latestMetrics else { return }
@@ -943,11 +974,20 @@ final class BenchmarkViewModel: ObservableObject {
             backendProcessName: metrics.backendProcessName
         )
 
+        let (snapTokens, snapFirstTokenTime) = streamLock.withLock { ($0.tokenCount, $0.firstTokenTime) }
+        let snapTps: Double
+        if let ftt = snapFirstTokenTime, snapTokens > 0 {
+            let genElapsed = Date().timeIntervalSince(ftt)
+            snapTps = genElapsed > 0 ? Double(snapTokens) / genElapsed : 0
+        } else {
+            snapTps = 0
+        }
+
         var sample = BenchmarkSample(
             sessionId: sessionId,
             metrics: snapshotMetrics,
-            tokensGenerated: pendingTokenCount,
-            cumulativeTokensPerSecond: pendingTps
+            tokensGenerated: snapTokens,
+            cumulativeTokensPerSecond: snapTps
         )
 
         // Assign a local ID for in-memory tracking (DB will assign real ID on flush)
@@ -972,14 +1012,34 @@ final class BenchmarkViewModel: ObservableObject {
             powerSampleCount += 1
         }
 
+        // Flush power stats to @Published at sample rate (2Hz) — not 10Hz
+        if powerSampleCount > 0 {
+            let newAvgGpu = gpuPowerSum / Double(powerSampleCount)
+            if newAvgGpu != avgGpuPower { avgGpuPower = newAvgGpu }
+            if pendingPeakGpuPower != peakGpuPower { peakGpuPower = pendingPeakGpuPower }
+
+            let newAvgSys = systemPowerSum / Double(powerSampleCount)
+            if newAvgSys != avgSystemPower { avgSystemPower = newAvgSys }
+            if pendingPeakSystemPower != peakSystemPower { peakSystemPower = pendingPeakSystemPower }
+        }
+
+        // Debug state at sample rate (2Hz) — not per-chunk
+        let snapDebug = streamLock.withLock { (chunkCount: $0.chunkCount, bytesReceived: $0.bytesReceived) }
+        if snapDebug.chunkCount > 0 {
+            debugState.chunksReceived = snapDebug.chunkCount
+            debugState.bytesReceived = snapDebug.bytesReceived
+            debugState.lastChunkAt = Date()
+            debugState.phase = .streaming
+        }
+
         // Flush to database periodically (every 5s) instead of on every sample
         let now = Date()
         if now.timeIntervalSince(lastDBFlush) >= dbFlushInterval {
             await flushSamplesToDatabase()
         }
 
-        // Update chart data at throttled rate
-        if now.timeIntervalSince(lastChartUpdate) >= chartUpdateInterval {
+        // Update chart data at throttled rate (skip entirely when charts are hidden)
+        if showLiveCharts, now.timeIntervalSince(lastChartUpdate) >= chartUpdateInterval {
             lastChartUpdate = now
 
             let samples = currentSamplesInternal
@@ -1036,14 +1096,27 @@ final class BenchmarkViewModel: ObservableObject {
         benchmarkStartTime = nil
 
         // Dump any suppressed text before final flush
-        if !streamResponse && !textBuffer.isEmpty {
-            responseText += textBuffer
+        if !streamResponse {
+            let remaining = streamLock.withLock { buf -> String in
+                let t = buf.text; buf.text = ""; return t
+            }
+            if !remaining.isEmpty {
+                responseText += remaining
+            }
             responseTextStore.set(responseText)
-            textBuffer = ""
         }
 
         // Final flush of any remaining buffered content
-        flushUIUpdates()
+        flushTextOnly()
+        flushMetricUpdates()
+
+        // Final power stats flush
+        if powerSampleCount > 0 {
+            avgGpuPower = gpuPowerSum / Double(powerSampleCount)
+            peakGpuPower = pendingPeakGpuPower
+            avgSystemPower = systemPowerSum / Double(powerSampleCount)
+            peakSystemPower = pendingPeakSystemPower
+        }
 
         // Flush any remaining samples to database before finishing
         await flushSamplesToDatabase()
