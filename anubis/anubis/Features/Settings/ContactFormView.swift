@@ -104,7 +104,7 @@ struct ContactFormView: View {
                         .padding(8)
                         .background {
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(.regularMaterial)
+                                .fill(Color.cardBackground)
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 6)
                                         .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 1)

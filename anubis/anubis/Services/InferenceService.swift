@@ -254,42 +254,18 @@ final class InferenceService: ObservableObject {
 
     /// Generate a streaming response
     ///
-    /// Stream production runs off MainActor so network I/O and JSON parsing
-    /// don't compete with UI rendering for main-thread time.
-    func generate(request: InferenceRequest) -> AsyncThrowingStream<InferenceChunk, Error> {
+    /// Returns the backend stream directly — callers are responsible for
+    /// consuming off MainActor and calling `clearGenerating()` when done.
+    func generate(request: InferenceRequest) async -> AsyncThrowingStream<InferenceChunk, Error> {
         let backend = activeBackend
-        return AsyncThrowingStream { continuation in
-            Task.detached { [weak self] in
-                await MainActor.run { [weak self] in
-                    self?.isGenerating = true
-                    self?.lastError = nil
-                }
+        isGenerating = true
+        lastError = nil
+        return await backend.generate(request: request)
+    }
 
-                do {
-                    let stream = await backend.generate(request: request)
-                    for try await chunk in stream {
-                        continuation.yield(chunk)
-                        if chunk.done {
-                            break
-                        }
-                    }
-                    continuation.finish()
-                } catch {
-                    await MainActor.run { [weak self] in
-                        if let anubisError = error as? AnubisError {
-                            self?.lastError = anubisError
-                        } else {
-                            self?.lastError = .networkError(underlying: error)
-                        }
-                    }
-                    continuation.finish(throwing: error)
-                }
-
-                await MainActor.run { [weak self] in
-                    self?.isGenerating = false
-                }
-            }
-        }
+    /// Reset isGenerating flag — called by ViewModel when stream consumption finishes
+    func clearGenerating() {
+        isGenerating = false
     }
 
     /// Generate a complete (non-streaming) response
@@ -314,9 +290,9 @@ final class InferenceService: ObservableObject {
     // MARK: - Convenience Methods
 
     /// Quick generation with just model and prompt
-    func generate(model: String, prompt: String) -> AsyncThrowingStream<InferenceChunk, Error> {
+    func generate(model: String, prompt: String) async -> AsyncThrowingStream<InferenceChunk, Error> {
         let request = InferenceRequest(model: model, prompt: prompt)
-        return generate(request: request)
+        return await generate(request: request)
     }
 
     /// Get OpenAI client for a specific configuration

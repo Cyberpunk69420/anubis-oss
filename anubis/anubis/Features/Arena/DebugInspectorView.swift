@@ -110,7 +110,7 @@ struct DebugInspectorPanel: View {
             }
         }
         .padding(Spacing.sm)
-        .background(.thickMaterial)
+        .background(Color.cardBackgroundElevated)
         .overlay(alignment: .top) {
             Divider()
         }

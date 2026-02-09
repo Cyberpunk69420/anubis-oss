@@ -8,6 +8,12 @@
 import Foundation
 import os.log
 
+/// Signpost logs for Instruments profiling (Time Profiler / os_signpost)
+enum Signposts {
+    /// Streaming performance intervals — visible in Instruments → os_signpost
+    static let streaming = OSLog(subsystem: "com.uncsoft.anubis", category: .pointsOfInterest)
+}
+
 /// Unified logging for Anubis
 enum Log {
     /// Logger for general app events

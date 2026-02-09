@@ -40,8 +40,7 @@ struct MetricsCard: View {
             Text(available ? value : "—")
                 .font(.anubisMetricSmall)
                 .foregroundStyle(available ? .primary : .tertiary)
-                .contentTransition(.numericText())
-                .animation(.anubisQuick, value: value)
+                .contentTransition(.identity)
 
             // Always show subtitle row to maintain consistent height
             Text(subtitle ?? " ")
@@ -111,8 +110,7 @@ struct CompactMetricsCard: View {
             Text(available ? value : "—")
                 .font(.anubisMetricCompact)
                 .foregroundStyle(available ? .primary : .tertiary)
-                .contentTransition(.numericText())
-                .animation(.anubisQuick, value: value)
+                .contentTransition(.identity)
 
             // Always render subtitle row to maintain consistent card height
             Text(subtitle ?? " ")
@@ -209,8 +207,7 @@ struct PrimaryMetricsCard: View {
 
             Text(value)
                 .font(.anubisMetric)
-                .contentTransition(.numericText())
-                .animation(.anubisQuick, value: value)
+                .contentTransition(.identity)
 
             if let subtitle = subtitle {
                 Text(subtitle)

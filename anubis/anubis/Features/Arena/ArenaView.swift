@@ -234,7 +234,7 @@ struct ArenaView: View {
                         .padding(Spacing.xs)
                         .background {
                             RoundedRectangle(cornerRadius: CornerRadius.md)
-                                .fill(.regularMaterial)
+                                .fill(Color.cardBackground)
                                 .overlay {
                                     RoundedRectangle(cornerRadius: CornerRadius.md)
                                         .strokeBorder(Color.cardBorder, lineWidth: 1)
@@ -362,7 +362,7 @@ struct ArenaView: View {
                     .padding(Spacing.xs)
                     .background {
                         RoundedRectangle(cornerRadius: CornerRadius.md)
-                            .fill(.regularMaterial)
+                            .fill(Color.cardBackground)
                             .overlay {
                                 RoundedRectangle(cornerRadius: CornerRadius.md)
                                     .strokeBorder(Color.cardBorder, lineWidth: 1)
@@ -619,7 +619,7 @@ struct ComparisonPanel: View {
         .padding(Spacing.md)
         .background {
             RoundedRectangle(cornerRadius: CornerRadius.lg)
-                .fill(.regularMaterial)
+                .fill(Color.cardBackgroundElevated)
                 .overlay {
                     RoundedRectangle(cornerRadius: CornerRadius.lg)
                         .strokeBorder(Color.cardBorder, lineWidth: 1)

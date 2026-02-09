@@ -39,7 +39,7 @@ struct DemoModeIndicator: View {
         .padding(.vertical, 6)
         .background {
             Capsule()
-                .fill(.ultraThinMaterial)
+                .fill(Color.cardBackground)
                 .overlay {
                     Capsule()
                         .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
@@ -291,7 +291,7 @@ struct BackendStatusView: View {
                 .padding(.vertical, 8)
                 .background {
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(.regularMaterial)
+                        .fill(Color.cardBackground)
                         .overlay {
                             RoundedRectangle(cornerRadius: 6)
                                 .strokeBorder(Color.cardBorder, lineWidth: 1)

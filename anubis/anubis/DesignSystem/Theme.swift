@@ -147,7 +147,7 @@ extension View {
             .padding(Spacing.md)
             .background {
                 RoundedRectangle(cornerRadius: CornerRadius.lg)
-                    .fill(.regularMaterial)
+                    .fill(Color.cardBackgroundElevated)
                     .overlay {
                         RoundedRectangle(cornerRadius: CornerRadius.lg)
                             .strokeBorder(Color.cardBorder, lineWidth: 1)
@@ -163,7 +163,7 @@ extension View {
             .frame(maxWidth: .infinity)
             .background {
                 RoundedRectangle(cornerRadius: CornerRadius.md)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.cardBackground)
                     .overlay {
                         RoundedRectangle(cornerRadius: CornerRadius.md)
                             .strokeBorder(Color.cardBorder, lineWidth: 1)
@@ -180,7 +180,7 @@ extension View {
             .frame(maxWidth: .infinity)
             .background {
                 RoundedRectangle(cornerRadius: CornerRadius.sm)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.cardBackground)
                     .overlay {
                         RoundedRectangle(cornerRadius: CornerRadius.sm)
                             .strokeBorder(Color.cardBorder, lineWidth: 1)
