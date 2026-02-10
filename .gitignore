@@ -45,6 +45,7 @@ Package.resolved
 
 # Dev tools
 .claude/
+CLAUDE.md
 *.profraw
 
 # Documentation and assets not for repo
