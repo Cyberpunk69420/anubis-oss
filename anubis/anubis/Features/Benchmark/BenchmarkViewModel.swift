@@ -773,6 +773,9 @@ final class BenchmarkViewModel: ObservableObject {
         let autosaveName = NSWindow.FrameAutosaveName("AnubisHistoryWindow")
         if !window.setFrameAutosaveName(autosaveName) {
             window.center()
+        } else if window.frame.width < window.minSize.width || window.frame.height < window.minSize.height {
+            window.setContentSize(NSSize(width: 900, height: 600))
+            window.center()
         }
         window.makeKeyAndOrderFront(self)
         historyWindow = window
@@ -850,6 +853,10 @@ final class BenchmarkViewModel: ObservableObject {
             // First launch or name collision — set explicit frame and center
             window.setFrame(NSRect(x: 0, y: 0, width: width, height: height), display: false)
             window.center()
+        } else if window.frame.width < window.minSize.width || window.frame.height < window.minSize.height {
+            // Restored frame is too small (e.g. was minimized) — reset to default
+            window.setFrame(NSRect(x: 0, y: 0, width: width, height: height), display: false)
+            window.center()
         }
         window.makeKeyAndOrderFront(self)
         expandedMetricsWindow = window
@@ -880,6 +887,9 @@ final class BenchmarkViewModel: ObservableObject {
         window.tabbingMode = .disallowed
         let autosaveName = NSWindow.FrameAutosaveName("AnubisCoreDetailWindow")
         if !window.setFrameAutosaveName(autosaveName) {
+            window.center()
+        } else if window.frame.width < window.minSize.width || window.frame.height < window.minSize.height {
+            window.setContentSize(NSSize(width: 700, height: 500))
             window.center()
         }
         window.makeKeyAndOrderFront(self)

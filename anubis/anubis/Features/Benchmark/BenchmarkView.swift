@@ -144,6 +144,7 @@ struct BenchmarkView: View {
             .padding(.bottom, Spacing.md)
             .padding(.trailing, Spacing.lg)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     @MainActor
@@ -1235,6 +1236,7 @@ struct ExpandedMetricsView: View {
                 .padding(.bottom, Spacing.md)
                 .padding(.trailing, Spacing.lg)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var watermark: some View {
