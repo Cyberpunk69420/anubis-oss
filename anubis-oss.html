@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anubis OSS — Local LLM Benchmarking for Apple Silicon</title>
+    <meta name="description" content="Native macOS app for benchmarking local LLMs with real-time hardware telemetry. GPU, CPU, power, memory, and frequency correlated with inference performance.">
+    <meta property="og:title" content="Anubis OSS — Local LLM Benchmarking for Apple Silicon">
+    <meta property="og:description" content="Native macOS app for benchmarking local LLMs with real-time GPU, CPU, power, and memory telemetry.">
+    <meta property="og:image" content="https://github.com/user-attachments/assets/c52d4309-9adf-456f-84cc-12c0f0550996">
+    <meta property="og:type" content="website">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+            color: #e0e0e0;
+            background: #0a0a0a;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: #6cb4ee; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 80px 0 48px;
+        }
+        .hero img.icon {
+            width: 80px;
+            height: 92px;
+            margin-bottom: 20px;
+        }
+        .hero h1 {
+            font-size: 40px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .hero .tagline {
+            font-size: 18px;
+            color: #888;
+            max-width: 560px;
+            margin: 0 auto 32px;
+        }
+        .hero .buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            transition: opacity 0.15s;
+        }
+        .btn:hover { text-decoration: none; opacity: 0.85; }
+        .btn-primary {
+            background: #fff;
+            color: #000;
+        }
+        .btn-secondary {
+            background: #1a1a1a;
+            color: #e0e0e0;
+            border: 1px solid #333;
+        }
+
+        /* Badges */
+        .badges {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 40px;
+        }
+        .badge {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: #1a1a1a;
+            color: #888;
+            border: 1px solid #222;
+        }
+
+        /* Screenshots */
+        .screenshots {
+            padding: 48px 0;
+        }
+        .screenshots img {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid #222;
+            margin-bottom: 20px;
+        }
+
+        /* Features */
+        .features {
+            padding: 48px 0;
+        }
+        .features h2 {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+        .feature-card {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 10px;
+            padding: 24px;
+        }
+        .feature-card h3 {
+            font-size: 16px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .feature-card p {
+            font-size: 14px;
+            color: #777;
+            line-height: 1.5;
+        }
+
+        /* Why */
+        .why {
+            padding: 48px 0;
+            text-align: center;
+        }
+        .why h2 {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 16px;
+        }
+        .why p {
+            color: #888;
+            max-width: 640px;
+            margin: 0 auto 32px;
+            font-size: 15px;
+        }
+        .why-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            text-align: left;
+        }
+        .why-item {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .why-item .label {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 4px;
+        }
+        .why-item .text {
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        /* Backends */
+        .backends {
+            padding: 48px 0;
+        }
+        .backends h2 {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .backend-list {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .backend-chip {
+            font-size: 14px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #ccc;
+        }
+
+        /* Metrics table */
+        .metrics {
+            padding: 48px 0;
+        }
+        .metrics h2 {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        th {
+            text-align: left;
+            color: #666;
+            font-weight: 500;
+            padding: 10px 12px;
+            border-bottom: 1px solid #222;
+        }
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #151515;
+            color: #aaa;
+        }
+        td:first-child { color: #e0e0e0; font-weight: 500; }
+        code {
+            font-family: "SF Mono", Menlo, monospace;
+            font-size: 13px;
+            background: #1a1a1a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #ccc;
+        }
+
+        /* Requirements */
+        .requirements {
+            padding: 48px 0;
+            text-align: center;
+        }
+        .requirements h2 {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 24px;
+        }
+        .req-grid {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .req-item {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 10px;
+            padding: 20px 28px;
+            text-align: center;
+        }
+        .req-item .val {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+        .req-item .desc {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* CTA */
+        .cta {
+            padding: 64px 0;
+            text-align: center;
+            border-top: 1px solid #1a1a1a;
+        }
+        .cta h2 {
+            font-size: 24px;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .cta p {
+            color: #666;
+            margin-bottom: 24px;
+            font-size: 15px;
+        }
+
+        /* Footer */
+        footer {
+            padding: 32px 0;
+            text-align: center;
+            border-top: 1px solid #151515;
+            font-size: 13px;
+            color: #444;
+        }
+        footer a { color: #555; }
+        footer a:hover { color: #888; }
+
+        /* Responsive */
+        @media (max-width: 700px) {
+            .hero h1 { font-size: 28px; }
+            .feature-grid { grid-template-columns: 1fr; }
+            .why-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Hero -->
+    <section class="hero">
+        <img class="icon" src="https://github.com/user-attachments/assets/4369ce8d-8f3a-4502-9c49-6f3a82372e00" alt="Anubis icon">
+        <h1>Anubis OSS</h1>
+        <p class="tagline">Local LLM benchmarking for Apple Silicon with real-time hardware telemetry</p>
+        <div class="badges">
+            <span class="badge">macOS 15+</span>
+            <span class="badge">Apple Silicon</span>
+            <span class="badge">SwiftUI</span>
+            <span class="badge">GPL-3.0</span>
+        </div>
+        <div class="buttons">
+            <a href="https://github.com/uncSoft/anubis-oss/releases/latest" class="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4-4h2.5V3h3v5H12L8 12z"/><path d="M14 13H2v1h12v-1z"/></svg>
+                Download
+            </a>
+            <a href="https://github.com/uncSoft/anubis-oss" class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                GitHub
+            </a>
+            <a href="https://ko-fi.com/jtatuncsoft/tip" class="btn btn-secondary">
+                ☕ Support
+            </a>
+        </div>
+    </section>
+
+    <!-- Screenshots -->
+    <section class="screenshots">
+        <img src="https://github.com/user-attachments/assets/e8eabae3-3bba-4171-ab3f-f42bd73d4d19" alt="Anubis benchmark dashboard" loading="lazy">
+        <img src="https://github.com/user-attachments/assets/c52d4309-9adf-456f-84cc-12c0f0550996" alt="Anubis expanded metrics export" loading="lazy">
+    </section>
+
+    <!-- Why -->
+    <section class="why">
+        <h2>Why Anubis?</h2>
+        <p>The local LLM ecosystem on macOS is fragmented. Chat wrappers focus on conversation, performance monitors are CLI-only, and no tool correlates hardware metrics with inference speed in real time.</p>
+        <div class="why-grid">
+            <div class="why-item">
+                <div class="label">Chat wrappers</div>
+                <div class="text">Ollama, LM Studio, Jan focus on conversation &mdash; not systematic testing</div>
+            </div>
+            <div class="why-item">
+                <div class="label">Performance monitors</div>
+                <div class="text">asitop, macmon, mactop are CLI-only and lack LLM context</div>
+            </div>
+            <div class="why-item">
+                <div class="label">Eval frameworks</div>
+                <div class="text">promptfoo requires YAML configs and terminal expertise</div>
+            </div>
+            <div class="why-item">
+                <div class="label">Anubis</div>
+                <div class="text">Correlates GPU, CPU, power, memory, and frequency with inference &mdash; in a native macOS app</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+        <h2>Features</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>Benchmark</h3>
+                <p>Real-time dashboard with 8 metric cards, 7 live charts, power telemetry, and configurable prompt presets. Stream responses with live hardware overlay.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Arena</h3>
+                <p>Side-by-side A/B model comparison. Sequential or parallel execution. Vote for a winner &mdash; results are persisted with full stats.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Vault</h3>
+                <p>Unified model management across all backends. Pull, delete, inspect, and unload models. Automatic metadata enrichment from HuggingFace and LM Studio caches.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Power Telemetry</h3>
+                <p>GPU, CPU, ANE, and DRAM power in watts via IOReport. See watts-per-token efficiency &mdash; compare quantizations by their actual power cost.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Process Monitoring</h3>
+                <p>Auto-detects the backend process by port. Tracks real memory footprint including Metal/GPU allocations. Manual override available.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Export &amp; History</h3>
+                <p>Session history with full replay. Export as CSV, Markdown, or shareable 2x retina PNG images with one click. Respects light/dark mode.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Backends -->
+    <section class="backends">
+        <h2>Supported Backends</h2>
+        <div class="backend-list">
+            <span class="backend-chip">Ollama</span>
+            <span class="backend-chip">LM Studio</span>
+            <span class="backend-chip">mlx-lm</span>
+            <span class="backend-chip">vLLM</span>
+            <span class="backend-chip">LocalAI</span>
+            <span class="backend-chip">OpenWebUI</span>
+            <span class="backend-chip">Docker Models</span>
+            <span class="backend-chip">Any OpenAI-compatible</span>
+        </div>
+    </section>
+
+    <!-- Hardware Metrics -->
+    <section class="metrics">
+        <h2>Hardware Metrics</h2>
+        <table>
+            <thead>
+                <tr><th>Metric</th><th>Source</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>GPU Utilization</td><td>IOReport</td><td>GPU active residency percentage</td></tr>
+                <tr><td>CPU Utilization</td><td><code>host_processor_info</code></td><td>Usage across all cores</td></tr>
+                <tr><td>GPU Power</td><td>IOReport Energy Model</td><td>GPU power consumption in watts</td></tr>
+                <tr><td>CPU Power</td><td>IOReport Energy Model</td><td>CPU (E-cores + P-cores) power in watts</td></tr>
+                <tr><td>ANE Power</td><td>IOReport Energy Model</td><td>Neural Engine power consumption</td></tr>
+                <tr><td>DRAM Power</td><td>IOReport Energy Model</td><td>Memory subsystem power</td></tr>
+                <tr><td>GPU Frequency</td><td>IOReport GPU Stats</td><td>Weighted average from P-state residency</td></tr>
+                <tr><td>Process Memory</td><td><code>proc_pid_rusage</code></td><td>Backend <code>phys_footprint</code> (includes Metal/GPU)</td></tr>
+                <tr><td>Thermal State</td><td><code>ProcessInfo</code></td><td>System thermal pressure level</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Screenshots row 2 -->
+    <section class="screenshots">
+        <img src="https://github.com/user-attachments/assets/fcbb9dbe-14bb-46ff-a956-64445372c53e" alt="Anubis arena comparison" loading="lazy">
+        <img src="https://github.com/user-attachments/assets/81b14a1c-4196-4462-b56c-28d2da9cb0b6" alt="Anubis vault" loading="lazy">
+    </section>
+
+    <!-- Requirements -->
+    <section class="requirements">
+        <h2>Requirements</h2>
+        <div class="req-grid">
+            <div class="req-item">
+                <div class="val">macOS 15.0+</div>
+                <div class="desc">Sequoia or later</div>
+            </div>
+            <div class="req-item">
+                <div class="val">Apple Silicon</div>
+                <div class="desc">M1 / M2 / M3 / M4</div>
+            </div>
+            <div class="req-item">
+                <div class="val">8 GB+</div>
+                <div class="desc">16 GB recommended</div>
+            </div>
+            <div class="req-item">
+                <div class="val">Ollama</div>
+                <div class="desc">Or any backend</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta">
+        <h2>Try Anubis OSS</h2>
+        <p>Free and open source. Download the notarized app or build from source.</p>
+        <div class="buttons">
+            <a href="https://github.com/uncSoft/anubis-oss/releases/latest" class="btn btn-primary">
+                Download Latest Release
+            </a>
+            <a href="https://github.com/uncSoft/anubis-oss" class="btn btn-secondary">
+                View on GitHub
+            </a>
+        </div>
+    </section>
+
+</div>
+
+<footer>
+    <div class="container">
+        <p>
+            Anubis OSS &mdash; GPL-3.0 &mdash;
+            <a href="https://github.com/uncSoft/anubis-oss">GitHub</a> &middot;
+            <a href="https://ko-fi.com/jtatuncsoft/tip">Ko-fi</a> &middot;
+            <a href="https://apps.apple.com/us/app-bundle/the-architects-toolkit/id1874965091?mt=12">App Store</a> &middot;
+            <a href="https://www.devpadapp.com">DevPad</a> &middot;
+            <a href="https://www.devpadapp.com/nabu.html">Nabu</a>
+        </p>
+    </div>
+</footer>
+
+</body>
+</html>

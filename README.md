@@ -3,7 +3,7 @@
 [![macOS 15+](https://img.shields.io/badge/macOS-15.0%2B-blue?logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Swift](https://img.shields.io/badge/Swift-5-orange?logo=swift&logoColor=white)](https://swift.org)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/Cyberpunk69420/anubis-oss?label=Download&color=brightgreen)](https://github.com/Cyberpunk69420/anubis-oss/releases/latest)
+[![GitHub Release](https://img.shields.io/github/v/release/uncSoft/anubis-oss?label=Download&color=brightgreen)](https://github.com/uncSoft/anubis-oss/releases/latest)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Tip%20Jar-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/jtatuncsoft/tip)
 
 **Local LLM Testing & Benchmarking for Apple Silicon**
@@ -154,7 +154,7 @@ ollama pull llama3.2:3b
 ### 2. Build & Run Anubis
 
 ```bash
-git clone https://github.com/Cyberpunk69420/anubis-oss.git
+git clone https://github.com/uncSoft/anubis-oss.git
 cd anubis-oss/anubis
 open anubis.xcodeproj
 ```
@@ -178,7 +178,7 @@ Anubis will auto-detect Ollama on launch. Other backends can be added in Setting
 
 ```bash
 # Clone
-git clone https://github.com/Cyberpunk69420/anubis-oss.git
+git clone https://github.com/uncSoft/anubis-oss.git
 cd anubis-oss/anubis
 
 # Build via command line
@@ -322,7 +322,7 @@ Contributions are welcome. A few guidelines:
 
 ## Support the Project
 
-If Anubis is useful to you, consider [buying me a coffee on Ko-fi](https://ko-fi.com/jtatuncsoft/tip) or [sponsoring on GitHub](https://github.com/sponsors/Cyberpunk69420). It helps fund continued development and new features.
+If Anubis is useful to you, consider [buying me a coffee on Ko-fi](https://ko-fi.com/jtatuncsoft/tip) or [sponsoring on GitHub](https://github.com/sponsors/uncSoft). It helps fund continued development and new features.
 
 A sandboxed, less feature rich version is also available on the [Mac App Store](https://apps.apple.com/us/app-bundle/the-architects-toolkit/id1874965091?mt=12) if you prefer a managed install.
 
